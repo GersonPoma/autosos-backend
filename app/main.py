@@ -44,6 +44,8 @@ from app.api.talleres import tenant as tenant_api
 # APIs pagos
 from app.api.pagos import detalle_orden as detalle_orden_api
 from app.api.pagos import transaccion as transaccion_api
+# APIs analítica
+from app.api.analitica import kpi_router as kpi_router_api
 
 Base.metadata.create_all(bind=engine)
 
@@ -106,6 +108,9 @@ app.include_router(tenant_api.router)
 # Pagos
 app.include_router(detalle_orden_api.router)
 app.include_router(transaccion_api.router)
+
+# Analítica
+app.include_router(kpi_router_api.router)
 
 
 @app.get("/")
