@@ -97,6 +97,7 @@ def aceptar(db: Session, cotizacion_id: int) -> dict:
     cotizacion.estado_cotizacion = EstadoCotizacion.ACEPTADA
     asignacion.estado = EstadoNotificacion.ACEPTADO
     incidente.estado = EstadoIncidente.EN_PROCESO
+    incidente.tenant_id = asignacion.taller.tenant_id
 
     otras = db.query(AsignacionCandidato).filter(
         AsignacionCandidato.incidente_id == incidente.id,
