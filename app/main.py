@@ -70,6 +70,7 @@ origins = [
     "http://127.0.0.1",
     "https://backend-emergencia-vehiculares.onrender.com",
     "https://frontend-emergencia-vehiculares.vercel.app",
+    "https://autosos-api.ddns.net",
 ]
 
 app.add_middleware(
