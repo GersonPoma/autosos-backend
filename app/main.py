@@ -46,6 +46,7 @@ from app.api.pagos import detalle_orden as detalle_orden_api
 from app.api.pagos import transaccion as transaccion_api
 # APIs analítica
 from app.api.analitica import kpi_router as kpi_router_api
+from app.api.analitica import reporte_voz_router as reporte_voz_api
 # Tracking WebSocket
 from app.tracking import router as tracking_router
 
@@ -113,6 +114,7 @@ app.include_router(transaccion_api.router)
 
 # Analítica
 app.include_router(kpi_router_api.router)
+app.include_router(reporte_voz_api.router)
 
 # Tracking WebSocket
 app.include_router(tracking_router.router)
