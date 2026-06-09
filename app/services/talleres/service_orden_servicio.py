@@ -6,7 +6,7 @@ from app.core.paginacion import PaginacionSalida
 from app.models.perfiles.taller import Taller
 from app.models.talleres.asignacion_candidato import AsignacionCandidato, EstadoNotificacion
 from app.models.talleres.cotizacion import Cotizacion
-from app.models.talleres.orden_servicio import OrdenServicio
+from app.models.talleres.orden_servicio import OrdenServicio, EstadoOperacion
 
 
 def formatear_tiempo_hms(segundos: int) -> str:
@@ -162,6 +162,25 @@ def obtener_por_incidente_id(db: Session, incidente_id: int):
     )
     if not orden:
         return None
+    return _mapear_orden_salida(orden)
+
+
+def cambiar_estado(db: Session, orden_id: int, nuevo_estado: EstadoOperacion):
+    from datetime import datetime, timezone
+    orden = db.query(OrdenServicio).filter(
+        OrdenServicio.id == orden_id,
+        OrdenServicio.deleted == False,
+    ).first()
+    if not orden:
+        return None
+    orden.estado = nuevo_estado
+    now = datetime.now(timezone.utc)
+    if nuevo_estado == EstadoOperacion.DIAGNOSTICANDO and not orden.fecha_hora_llegada:
+        orden.fecha_hora_llegada = now
+    elif nuevo_estado == EstadoOperacion.FINALIZADO and not orden.fecha_hora_fin:
+        orden.fecha_hora_fin = now
+    db.commit()
+    db.refresh(orden)
     return _mapear_orden_salida(orden)
 
 

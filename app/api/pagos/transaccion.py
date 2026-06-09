@@ -6,7 +6,10 @@ from app.core.security import get_current_user
 from app.db.session import get_db
 from app.schemas.pagos.detalle_orden import GenerarPagoEntrada
 from app.schemas.pagos.transaccion import ActualizarEstadoEntrada, GenerarPagoSalida, StripeIntentSalida, TransaccionEntrada, TransaccionSalida
+from app.models.talleres.orden_servicio import OrdenServicio as OrdenModel, EstadoOperacion
 from app.services.pagos import service_transaccion
+from app.services.talleres import service_orden_servicio
+from app.tracking.manager import manager
 
 router = APIRouter(
     prefix="/transacciones",
@@ -16,8 +19,21 @@ router = APIRouter(
 
 
 @router.post("/generar-pago", response_model=GenerarPagoSalida, status_code=status.HTTP_201_CREATED)
-def generar_pago(entrada: GenerarPagoEntrada, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    return service_transaccion.generar_pago(db, entrada.orden_servicio_id, entrada.servicios, current_user.tenant_id)
+async def generar_pago(entrada: GenerarPagoEntrada, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    resultado = service_transaccion.generar_pago(db, entrada.orden_servicio_id, entrada.servicios, current_user.tenant_id)
+    orden = db.query(OrdenModel).filter(OrdenModel.id == entrada.orden_servicio_id).first()
+    if orden:
+        incidente_id = orden.cotizacion.asignacion_candidato.incidente_id
+        service_orden_servicio.cambiar_estado(db, entrada.orden_servicio_id, EstadoOperacion.FINALIZADO)
+        await manager.broadcast(incidente_id, {
+            "evento": "estado_orden_cambiado",
+            "data": {"orden_id": entrada.orden_servicio_id, "estado": "FINALIZADO"},
+        })
+        await manager.broadcast(incidente_id, {
+            "evento": "transaccion_creada",
+            "data": {"orden_servicio_id": entrada.orden_servicio_id},
+        })
+    return resultado
 
 
 @router.post("/", response_model=TransaccionSalida, status_code=status.HTTP_201_CREATED)

@@ -4,11 +4,13 @@ from sqlalchemy.orm import Session
 from app.core.paginacion import PaginacionSalida
 from app.core.security import get_current_user
 from app.db.session import get_db
+from app.models.talleres.asignacion_candidato import AsignacionCandidato as AsignacionModel
 from app.schemas.talleres.asignacion_candidato import (
     AsignacionCandidatoSalida,
     RechazarEmergenciaSalida,
 )
 from app.services.talleres import service_asignacion
+from app.tracking.manager import manager
 
 router = APIRouter(
     prefix="/asignaciones",
@@ -32,8 +34,18 @@ def ver_aceptadas_por_tenant(tenant_id: int, pagina: int = 1, limite: int = 10, 
     return service_asignacion.obtener_aceptadas_por_tenant(db, tenant_id, pagina, limite)
 
 
-
 @router.post("/asignacion/{asignacion_id}/rechazar", response_model=RechazarEmergenciaSalida)
-def rechazar_emergencia(asignacion_id: int, db: Session = Depends(get_db)):
+async def rechazar_emergencia(asignacion_id: int, db: Session = Depends(get_db)):
     """Endpoint cuando el mecánico rechaza o ignora una emergencia."""
-    return service_asignacion.rechazar_asignacion(db=db, asignacion_id=asignacion_id)
+    asignacion = db.query(AsignacionModel).filter(
+        AsignacionModel.id == asignacion_id,
+        AsignacionModel.deleted == False,
+    ).first()
+    incidente_id = asignacion.incidente_id if asignacion else None
+    resultado = service_asignacion.rechazar_asignacion(db=db, asignacion_id=asignacion_id)
+    if incidente_id:
+        await manager.broadcast(incidente_id, {
+            "evento": "asignacion_rechazada",
+            "data": {"asignacion_id": asignacion_id},
+        })
+    return resultado
