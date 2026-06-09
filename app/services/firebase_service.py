@@ -29,6 +29,7 @@ def _get_app():
 
 def enviar_notificacion(fcm_token: str, titulo: str, cuerpo: str, data: dict = None) -> bool:
     try:
+        print(f"[FCM] Enviando notificación → titulo='{titulo}' token={fcm_token[:20]}...")
         _get_app()
         payload = {"titulo": titulo, "cuerpo": cuerpo}
         payload.update({k: str(v) for k, v in (data or {}).items()})
@@ -36,8 +37,9 @@ def enviar_notificacion(fcm_token: str, titulo: str, cuerpo: str, data: dict = N
             data=payload,
             token=fcm_token,
         )
-        messaging.send(message)
+        response = messaging.send(message)
+        print(f"[FCM] Enviado OK → message_id={response}")
         return True
     except Exception as e:
-        print(f"Error FCM: {e}")
+        print(f"[FCM] ERROR al enviar: {type(e).__name__}: {e}")
         return False
