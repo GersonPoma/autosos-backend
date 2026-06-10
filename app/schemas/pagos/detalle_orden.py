@@ -4,15 +4,16 @@ from pydantic import BaseModel
 
 
 class DetalleOrdenEntrada(BaseModel):
-    precio_cobrado: float
-    comentario: Optional[str] = None
+    cantidad: int
+    precio_unitario: float
+    subtotal: float
     orden_servicio_id: int
     servicio_taller_id: int
 
 
 class DetalleOrdenItemEntrada(BaseModel):
     servicio_taller_id: int
-    comentario: Optional[str] = None
+    cantidad: int = 1
 
 
 class GenerarPagoEntrada(BaseModel):
@@ -22,9 +23,12 @@ class GenerarPagoEntrada(BaseModel):
 
 class DetalleOrdenSalida(BaseModel):
     id: int
-    precio_cobrado: float
-    comentario: Optional[str]
-    orden_servicio_id: int
     servicio_taller_id: int
-    nombre_servicio: str
-    categoria: str
+    servicio_nombre: Optional[str] = None
+    cantidad: int
+    precio_unitario: float
+    subtotal: float
+    orden_servicio_id: int
+
+    class Config:
+        from_attributes = True

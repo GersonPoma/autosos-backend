@@ -13,12 +13,12 @@ from app.schemas.pagos.detalle_orden import DetalleOrdenEntrada, DetalleOrdenIte
 def _mapear_salida(detalle: DetalleOrden) -> dict:
     return {
         "id": detalle.id,
-        "precio_cobrado": detalle.precio_cobrado,
-        "comentario": detalle.comentario,
-        "orden_servicio_id": detalle.orden_servicio_id,
         "servicio_taller_id": detalle.servicio_taller_id,
-        "nombre_servicio": detalle.servicio_taller.nombre if detalle.servicio_taller else "",
-        "categoria": detalle.servicio_taller.categoria if detalle.servicio_taller else "",
+        "servicio_nombre": detalle.servicio_nombre,
+        "cantidad": detalle.cantidad,
+        "precio_unitario": detalle.precio_unitario,
+        "subtotal": detalle.subtotal,
+        "orden_servicio_id": detalle.orden_servicio_id,
     }
 
 
@@ -44,14 +44,16 @@ def crear_lote(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"ServicioTaller {item.servicio_taller_id} no encontrado",
             )
+        subtotal = round(servicio.precio * item.cantidad, 2)
         detalle = DetalleOrden(
-            precio_cobrado=servicio.precio,
-            comentario=item.comentario,
+            cantidad=item.cantidad,
+            precio_unitario=servicio.precio,
+            subtotal=subtotal,
             orden_servicio_id=orden_servicio_id,
             servicio_taller_id=item.servicio_taller_id,
         )
         db.add(detalle)
-        total += servicio.precio
+        total += subtotal
         detalles.append(detalle)
     db.flush()
     for d in detalles:
@@ -61,8 +63,9 @@ def crear_lote(
 
 def crear(db: Session, entrada: DetalleOrdenEntrada) -> dict:
     detalle = DetalleOrden(
-        precio_cobrado=entrada.precio_cobrado,
-        comentario=entrada.comentario,
+        cantidad=entrada.cantidad,
+        precio_unitario=entrada.precio_unitario,
+        subtotal=entrada.subtotal,
         orden_servicio_id=entrada.orden_servicio_id,
         servicio_taller_id=entrada.servicio_taller_id,
     )
