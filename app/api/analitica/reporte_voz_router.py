@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
@@ -26,6 +26,8 @@ class PeticionExportar(BaseModel):
     transcripcion: str
     datos: dict[str, Any]
     formato: Literal["pdf", "excel"] = "pdf"
+    fecha_inicio: Optional[str] = None
+    fecha_fin: Optional[str] = None
 
 
 @router.post("/taller")
@@ -58,13 +60,19 @@ def reporte_cliente(
 @router.post("/exportar")
 def exportar_reporte(peticion: PeticionExportar):
     if peticion.formato == "pdf":
-        buffer = exportar_service.generar_pdf(peticion.titulo, peticion.transcripcion, peticion.datos)
+        buffer = exportar_service.generar_pdf(
+            peticion.titulo, peticion.transcripcion, peticion.datos,
+            peticion.fecha_inicio, peticion.fecha_fin,
+        )
         return StreamingResponse(
             buffer,
             media_type="application/pdf",
             headers={"Content-Disposition": 'attachment; filename="reporte.pdf"'},
         )
-    buffer = exportar_service.generar_excel(peticion.titulo, peticion.transcripcion, peticion.datos)
+    buffer = exportar_service.generar_excel(
+        peticion.titulo, peticion.transcripcion, peticion.datos,
+        peticion.fecha_inicio, peticion.fecha_fin,
+    )
     return StreamingResponse(
         buffer,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
