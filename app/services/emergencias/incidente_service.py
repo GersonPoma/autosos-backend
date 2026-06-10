@@ -151,7 +151,7 @@ def obtener_detalle_incidente(db: Session, incidente_id: int) -> dict:
                 "longitud": taller.longitud
             }
 
-        orden = asignacion.orden_servicio
+        orden = asignacion.cotizacion.orden_servicio if asignacion.cotizacion else None
         if orden:
             orden_info = {
                 "id": orden.id,
