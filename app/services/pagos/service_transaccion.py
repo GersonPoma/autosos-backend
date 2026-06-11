@@ -1,8 +1,6 @@
 import math
 import stripe
 import os
-from typing import List
-
 from sqlalchemy.orm import Session
 
 from app.core.paginacion import PaginacionSalida
@@ -10,7 +8,8 @@ from app.models.emergencias.incidente import EstadoIncidente
 from app.models.pagos.transaccion import EstadoTransaccion, Transaccion, MetodoPago
 from app.models.talleres.asignacion_candidato import AsignacionCandidato
 from app.models.talleres.orden_servicio import EstadoOperacion, OrdenServicio
-from app.schemas.pagos.detalle_orden import DetalleOrdenItemEntrada
+from fastapi import HTTPException, status
+from app.models.pagos.detalle_orden import DetalleOrden
 from app.schemas.pagos.transaccion import TransaccionEntrada
 from app.services.pagos import service_detalle_orden
 
@@ -18,10 +17,19 @@ from app.services.pagos import service_detalle_orden
 def generar_pago(
     db: Session,
     orden_servicio_id: int,
-    items: List[DetalleOrdenItemEntrada],
     tenant_id: int | None = None,
 ) -> dict:
-    detalles, monto_cobrado = service_detalle_orden.crear_lote(db, orden_servicio_id, items)
+    detalles = db.query(DetalleOrden).filter(
+        DetalleOrden.orden_servicio_id == orden_servicio_id,
+        DetalleOrden.deleted == False,
+    ).all()
+    if not detalles:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La orden no tiene detalles. Inicialice primero desde la cotización.",
+        )
+
+    monto_cobrado = round(sum(d.subtotal for d in detalles), 2)
     monto_comision = round(monto_cobrado * 0.10, 2)
     transaccion = Transaccion(
         monto_cobrado=monto_cobrado,
@@ -35,8 +43,6 @@ def generar_pago(
         orden.estado = EstadoOperacion.FINALIZADO
     db.commit()
     db.refresh(transaccion)
-    for d in detalles:
-        db.refresh(d)
     return {
         "transaccion": transaccion,
         "detalles": [service_detalle_orden._mapear_salida(d) for d in detalles],

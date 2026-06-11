@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 from app.core.paginacion import PaginacionSalida
 from app.models.pagos.detalle_orden import DetalleOrden
 from app.models.perfiles.servicio_taller import ServicioTaller
-from app.schemas.pagos.detalle_orden import DetalleOrdenEntrada, DetalleOrdenItemEntrada
+from app.models.talleres.orden_servicio import OrdenServicio
+from app.schemas.pagos.detalle_orden import DetalleOrdenActualizar, DetalleOrdenEntrada, DetalleOrdenItemEntrada
 
 
 def _mapear_salida(detalle: DetalleOrden) -> dict:
@@ -20,6 +21,46 @@ def _mapear_salida(detalle: DetalleOrden) -> dict:
         "subtotal": detalle.subtotal,
         "orden_servicio_id": detalle.orden_servicio_id,
     }
+
+
+def inicializar_desde_cotizacion(db: Session, orden_servicio_id: int) -> List[dict]:
+    orden = db.query(OrdenServicio).filter(
+        OrdenServicio.id == orden_servicio_id,
+    ).first()
+    if not orden:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Orden de servicio no encontrada")
+
+    cotizacion = orden.cotizacion
+    if not cotizacion or not cotizacion.detalles:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="La orden no tiene cotización con detalles")
+
+    existentes = db.query(DetalleOrden).filter(
+        DetalleOrden.orden_servicio_id == orden_servicio_id,
+        DetalleOrden.deleted == False,
+    ).all()
+    if existentes:
+        return [_mapear_salida(d) for d in existentes]
+
+    detalles = []
+    for dc in cotizacion.detalles:
+        if dc.deleted:
+            continue
+        subtotal = round(dc.precio_unitario * dc.cantidad, 2)
+        detalle = DetalleOrden(
+            cantidad=dc.cantidad,
+            precio_unitario=dc.precio_unitario,
+            subtotal=subtotal,
+            orden_servicio_id=orden_servicio_id,
+            servicio_taller_id=dc.servicio_taller_id,
+        )
+        db.add(detalle)
+        detalles.append(detalle)
+
+    db.flush()
+    for d in detalles:
+        db.refresh(d)
+    db.commit()
+    return [_mapear_salida(d) for d in detalles]
 
 
 def crear_lote(
@@ -70,6 +111,25 @@ def crear(db: Session, entrada: DetalleOrdenEntrada) -> dict:
         servicio_taller_id=entrada.servicio_taller_id,
     )
     db.add(detalle)
+    db.commit()
+    db.refresh(detalle)
+    return _mapear_salida(detalle)
+
+
+def actualizar(db: Session, detalle_id: int, datos: DetalleOrdenActualizar) -> dict:
+    detalle = db.query(DetalleOrden).filter(
+        DetalleOrden.id == detalle_id,
+        DetalleOrden.deleted == False,
+    ).first()
+    if not detalle:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Detalle de orden no encontrado")
+
+    if datos.cantidad is not None:
+        detalle.cantidad = datos.cantidad
+    if datos.precio_unitario is not None:
+        detalle.precio_unitario = datos.precio_unitario
+    detalle.subtotal = round(detalle.precio_unitario * detalle.cantidad, 2)
+
     db.commit()
     db.refresh(detalle)
     return _mapear_salida(detalle)

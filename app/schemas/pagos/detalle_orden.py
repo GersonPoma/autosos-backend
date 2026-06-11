@@ -16,9 +16,13 @@ class DetalleOrdenItemEntrada(BaseModel):
     cantidad: int = 1
 
 
+class DetalleOrdenActualizar(BaseModel):
+    cantidad: Optional[int] = None
+    precio_unitario: Optional[float] = None
+
+
 class GenerarPagoEntrada(BaseModel):
     orden_servicio_id: int
-    servicios: List[DetalleOrdenItemEntrada]
 
 
 class DetalleOrdenSalida(BaseModel):

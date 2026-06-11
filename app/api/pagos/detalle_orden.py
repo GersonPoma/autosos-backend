@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.paginacion import PaginacionSalida
 from app.core.security import get_current_user
 from app.db.session import get_db
-from app.schemas.pagos.detalle_orden import DetalleOrdenEntrada, DetalleOrdenSalida
+from app.schemas.pagos.detalle_orden import DetalleOrdenActualizar, DetalleOrdenEntrada, DetalleOrdenSalida
 from app.services.pagos import service_detalle_orden
 
 router = APIRouter(
@@ -12,6 +12,11 @@ router = APIRouter(
     tags=["Detalles de Orden"],
     dependencies=[Depends(get_current_user)],
 )
+
+
+@router.post("/inicializar/{orden_servicio_id}", response_model=list[DetalleOrdenSalida], status_code=status.HTTP_200_OK)
+def inicializar_desde_cotizacion(orden_servicio_id: int, db: Session = Depends(get_db)):
+    return service_detalle_orden.inicializar_desde_cotizacion(db, orden_servicio_id)
 
 
 @router.post("/", response_model=DetalleOrdenSalida, status_code=status.HTTP_201_CREATED)
@@ -30,6 +35,11 @@ def obtener(detalle_id: int, db: Session = Depends(get_db)):
     if not detalle:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Detalle de orden no encontrado")
     return detalle
+
+
+@router.put("/{detalle_id}", response_model=DetalleOrdenSalida)
+def actualizar(detalle_id: int, datos: DetalleOrdenActualizar, db: Session = Depends(get_db)):
+    return service_detalle_orden.actualizar(db, detalle_id, datos)
 
 
 @router.delete("/{detalle_id}", status_code=status.HTTP_204_NO_CONTENT)

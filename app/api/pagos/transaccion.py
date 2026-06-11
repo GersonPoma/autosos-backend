@@ -20,7 +20,7 @@ router = APIRouter(
 
 @router.post("/generar-pago", response_model=GenerarPagoSalida, status_code=status.HTTP_201_CREATED)
 async def generar_pago(entrada: GenerarPagoEntrada, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    resultado = service_transaccion.generar_pago(db, entrada.orden_servicio_id, entrada.servicios, current_user.tenant_id)
+    resultado = service_transaccion.generar_pago(db, entrada.orden_servicio_id, current_user.tenant_id)
     orden = db.query(OrdenModel).filter(OrdenModel.id == entrada.orden_servicio_id).first()
     if orden:
         incidente_id = orden.cotizacion.asignacion_candidato.incidente_id
