@@ -52,6 +52,14 @@ async def cambiar_estado(orden_id: int, data: CambiarEstadoEntrada, db: Session 
     return orden
 
 
+@router.post("/{orden_id}/notificar-en-camino", status_code=status.HTTP_200_OK)
+def notificar_en_camino(orden_id: int, db: Session = Depends(get_db)):
+    enviado = service_orden_servicio.notificar_en_camino(db, orden_id)
+    if not enviado:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Orden no encontrada o el cliente no tiene token FCM")
+    return {"mensaje": "Notificación enviada al cliente"}
+
+
 @router.patch("/{orden_id}/calificar", response_model=OrdenServicioSalida)
 def calificar(orden_id: int, data: OrdenServicioCalificar, db: Session = Depends(get_db)):
     orden = service_orden_servicio.calificar(db, orden_id, data.estrellas, data.comentario)
