@@ -34,6 +34,7 @@ def enviar_notificacion(fcm_token: str, titulo: str, cuerpo: str, data: dict = N
         payload = {"titulo": titulo, "cuerpo": cuerpo}
         payload.update({k: str(v) for k, v in (data or {}).items()})
         message = messaging.Message(
+            notification=messaging.Notification(title=titulo, body=cuerpo),
             data=payload,
             token=fcm_token,
         )
