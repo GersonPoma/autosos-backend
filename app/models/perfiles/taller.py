@@ -15,6 +15,7 @@ class Taller(Base, SoftDelete):
     disponible = Column(Boolean, nullable=False, default=True)
     latitud = Column(Float, nullable=False)
     longitud = Column(Float, nullable=False)
+    score_confianza = Column(Integer, nullable=False, default=70)
 
     usuario_id = Column(Integer, ForeignKey("usuario.id"), nullable=False, unique=True)
     tenant_id = Column(Integer, ForeignKey("tenant.id"), nullable=True)

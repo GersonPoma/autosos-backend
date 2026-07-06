@@ -10,6 +10,7 @@ from app.models.talleres.asignacion_candidato import AsignacionCandidato, Estado
 from app.models.talleres.cotizacion import Cotizacion
 from app.models.talleres.orden_servicio import OrdenServicio, EstadoOperacion
 from app.services.firebase_service import enviar_notificacion
+from app.services.perfiles import reputacion_service
 
 
 def formatear_tiempo_hms(segundos: int) -> str:
@@ -178,12 +179,22 @@ def cambiar_estado(db: Session, orden_id: int, nuevo_estado: EstadoOperacion):
         return None
     orden.estado = nuevo_estado
     now = datetime.now(timezone.utc)
-    if nuevo_estado == EstadoOperacion.DIAGNOSTICANDO and not orden.fecha_hora_llegada:
+    llego_recien = nuevo_estado == EstadoOperacion.DIAGNOSTICANDO and not orden.fecha_hora_llegada
+    if llego_recien:
         orden.fecha_hora_llegada = now
     elif nuevo_estado == EstadoOperacion.FINALIZADO and not orden.fecha_hora_fin:
         orden.fecha_hora_fin = now
     db.commit()
     db.refresh(orden)
+
+    if llego_recien:
+        _, _, taller = _resolver(orden)
+        if taller:
+            segundos_transcurridos = (orden.fecha_hora_llegada - orden.fecha_hora).total_seconds()
+            reputacion_service.evaluar_sla_llegada(
+                db, taller.id, segundos_transcurridos, orden.tiempo_estimado_llegada
+            )
+
     return _mapear_orden_salida(orden)
 
 
@@ -233,4 +244,9 @@ def calificar(db: Session, orden_id: int, estrellas: float, comentario: str | No
     orden.comentario = comentario
     db.commit()
     db.refresh(orden)
+
+    _, _, taller = _resolver(orden)
+    if taller:
+        reputacion_service.evaluar_calificacion(db, taller.id, estrellas)
+
     return _mapear_orden_salida(orden)

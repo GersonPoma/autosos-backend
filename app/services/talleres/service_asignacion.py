@@ -28,6 +28,22 @@ def calcular_distancia_km(lat1: float, lon1: float, lat2: float, lon2: float) ->
     return round(R * c, 2)
 
 
+# Peso de la distancia en el puntaje final, por prioridad del incidente.
+# A mayor peso, más castiga la distancia frente al score de confianza del taller.
+PESO_DISTANCIA_POR_PRIORIDAD = {
+    "Alta": 3.0,
+    "Media": 2.0,
+    "Baja": 1.0,
+}
+
+
+def calcular_puntaje_final(score_confianza: int, distancia_km: float, prioridad: str) -> float:
+    """Combina reputación y cercanía: un taller cercano pero poco confiable puede quedar
+    detrás de uno un poco más lejano con mejor historial."""
+    peso_distancia = PESO_DISTANCIA_POR_PRIORIDAD.get(prioridad, PESO_DISTANCIA_POR_PRIORIDAD["Media"])
+    return score_confianza - (distancia_km * peso_distancia)
+
+
 def _subquery_talleres_contactados_por_incidente(db: Session, incidente_id: int):
     return (
         db.query(AsignacionCandidato.taller_id)
@@ -116,23 +132,28 @@ def buscar_y_notificar_talleres(
         servicio = next((s for s in taller.servicios if s.categoria == categoria_problema), None)
         precio_servicio = servicio.precio if servicio else 0.0
 
+        puntaje_final = calcular_puntaje_final(taller.score_confianza, distancia, prioridad)
+
         evaluados.append({
             "taller_id": taller.id,
             "taller_usuario_id": taller.usuario_id,
             "distancia_km": distancia,
-            "precio": precio_servicio
+            "precio": precio_servicio,
+            "score_confianza": taller.score_confianza,
+            "puntaje_final": puntaje_final,
         })
 
     # Paso C: La Inteligencia de Asignación (Reglas de Negocio)
+    # El puntaje_final ya combina distancia + score de confianza (ver calcular_puntaje_final).
     if prioridad == "Alta":
-        # Prioridad Alta: La vida o el auto corren riesgo. Solo importa llegar rápido.
-        evaluados.sort(key=lambda x: x["distancia_km"])
+        # Prioridad Alta: la rapidez manda, pero un taller con mal historial pierde puntos.
+        evaluados.sort(key=lambda x: x["puntaje_final"], reverse=True)
     elif prioridad == "Baja":
-        # Prioridad Baja: No hay prisa. El cliente prefiere lo más barato.
-        evaluados.sort(key=lambda x: (x["precio"], x["distancia_km"]))
+        # Prioridad Baja: primero lo más barato; entre empates, el más confiable/cercano.
+        evaluados.sort(key=lambda x: (x["precio"], -x["puntaje_final"]))
     else:
-        # Prioridad Media: Distancia por defecto
-        evaluados.sort(key=lambda x: x["distancia_km"])
+        # Prioridad Media: balance entre cercanía y reputación.
+        evaluados.sort(key=lambda x: x["puntaje_final"], reverse=True)
 
     # Paso D: Seleccionamos solo el "Top N" (Por defecto los 3 mejores)
     top_candidatos = evaluados[:limite_candidatos]

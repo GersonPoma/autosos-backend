@@ -33,6 +33,7 @@ class TallerSalida(BaseModel):
     longitud: float
     disponible: bool
     usuario_id: int
+    score_confianza: int
 
     class Config:
         from_attributes = True
