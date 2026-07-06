@@ -151,7 +151,7 @@ def obtener_detalle_incidente(db: Session, incidente_id: int) -> dict:
                 "longitud": taller.longitud
             }
 
-        orden = asignacion.orden_servicio
+        orden = asignacion.cotizacion.orden_servicio if asignacion.cotizacion else None
         if orden:
             orden_info = {
                 "id": orden.id,
@@ -161,11 +161,10 @@ def obtener_detalle_incidente(db: Session, incidente_id: int) -> dict:
                 "detalles": [
                     {
                         "id": d.id,
-                        "nombre_servicio": d.servicio_taller.nombre if d.servicio_taller else "Desconocido",
-                        "categoria": d.servicio_taller.categoria if d.servicio_taller else "Desconocido",
-                        "precio_cobrado": d.precio_cobrado,
-                        "comentario": d.comentario,
-                        "subtotal": d.precio_cobrado
+                        "servicio_nombre": d.servicio_nombre,
+                        "cantidad": d.cantidad,
+                        "precio_unitario": d.precio_unitario,
+                        "subtotal": d.subtotal,
                     } for d in orden.detalles
                 ] if orden.detalles else []
             }

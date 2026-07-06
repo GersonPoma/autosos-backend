@@ -1,14 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.paginacion import PaginacionSalida
 from app.core.security import get_current_user
 from app.db.session import get_db
-from app.models.cuentas.usuario import Usuario
+from app.models.talleres.orden_servicio import EstadoOperacion
 from app.schemas.talleres.orden_servicio import OrdenServicioSalida, OrdenServicioLista, OrdenServicioCalificar
 from app.services.talleres import service_orden_servicio
+from app.tracking.manager import manager
 
 router = APIRouter(prefix="/ordenes-servicio", tags=["Ordenes Servicio"], dependencies=[Depends(get_current_user)])
+
+
+class CambiarEstadoEntrada(BaseModel):
+    estado: EstadoOperacion
 
 
 @router.get("/", response_model=PaginacionSalida[OrdenServicioSalida])
@@ -34,6 +40,26 @@ def obtener_por_incidente(incidente_id: int, db: Session = Depends(get_db)):
     return orden
 
 
+@router.patch("/{orden_id}/estado", response_model=OrdenServicioSalida)
+async def cambiar_estado(orden_id: int, data: CambiarEstadoEntrada, db: Session = Depends(get_db)):
+    orden = service_orden_servicio.cambiar_estado(db, orden_id, data.estado)
+    if not orden:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Orden de servicio no encontrada")
+    await manager.broadcast(orden["incidente_id"], {
+        "evento": "estado_orden_cambiado",
+        "data": {"orden_id": orden_id, "estado": data.estado.value},
+    })
+    return orden
+
+
+@router.post("/{orden_id}/notificar-en-camino", status_code=status.HTTP_200_OK)
+def notificar_en_camino(orden_id: int, db: Session = Depends(get_db)):
+    enviado = service_orden_servicio.notificar_en_camino(db, orden_id)
+    if not enviado:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Orden no encontrada o el cliente no tiene token FCM")
+    return {"mensaje": "Notificación enviada al cliente"}
+
+
 @router.patch("/{orden_id}/calificar", response_model=OrdenServicioSalida)
 def calificar(orden_id: int, data: OrdenServicioCalificar, db: Session = Depends(get_db)):
     orden = service_orden_servicio.calificar(db, orden_id, data.estrellas, data.comentario)
@@ -48,4 +74,3 @@ def obtener_por_id(orden_id: int, db: Session = Depends(get_db)):
     if not orden:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Orden de servicio no encontrada")
     return orden
-

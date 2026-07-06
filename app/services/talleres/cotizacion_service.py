@@ -118,16 +118,12 @@ def aceptar(db: Session, cotizacion_id: int) -> dict:
     db.commit()
     db.refresh(orden)
 
-    usuario_cliente = db.query(Usuario).filter(
-        Usuario.id == incidente.usuario_id,
-        Usuario.deleted == False,
-    ).first()
-    if usuario_cliente and usuario_cliente.fcm_token:
-        minutos = tiempo_calculado // 60
+    usuario_taller = asignacion.taller.usuario if asignacion.taller else None
+    if usuario_taller and usuario_taller.fcm_token:
         enviar_notificacion(
-            fcm_token=usuario_cliente.fcm_token,
-            titulo="¡Tu solicitud fue aceptada!",
-            cuerpo=f"El taller está en camino. Tiempo estimado: {minutos} minutos.",
+            fcm_token=usuario_taller.fcm_token,
+            titulo="¡Cotización aceptada!",
+            cuerpo="El cliente aceptó tu cotización. Ya puedes dirigirte al lugar.",
             data={"orden_id": str(orden.id), "incidente_id": str(incidente.id)},
         )
 

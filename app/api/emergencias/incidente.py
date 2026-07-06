@@ -7,6 +7,7 @@ from app.db.session import get_db
 from app.models.cuentas.usuario import Usuario
 from app.schemas.emergencias.incidente import IncidenteActualizar, IncidenteCrear, IncidenteSalida
 from app.services.emergencias import incidente_service
+from app.tracking.manager import manager
 
 router = APIRouter(prefix="/incidentes", tags=["Incidentes"])
 
@@ -81,7 +82,7 @@ def actualizar(
 
 
 @router.patch("/{incidente_id}/cancelar", response_model=IncidenteSalida)
-def cancelar_incidente(
+async def cancelar_incidente(
     incidente_id: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
@@ -89,5 +90,9 @@ def cancelar_incidente(
     incidente = incidente_service.cancelar_incidente(db, incidente_id)
     if not incidente:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incidente no encontrado")
+    await manager.broadcast(incidente_id, {
+        "evento": "incidente_cancelado",
+        "data": {"incidente_id": incidente_id},
+    })
     return incidente
 

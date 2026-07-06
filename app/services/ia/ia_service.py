@@ -11,6 +11,18 @@ from dotenv import load_dotenv
 load_dotenv()
 API_KEY = os.getenv("GEMINI_API_KEY")
 
+_CATEGORIA_NORMALIZADA = {
+    "batería": "Bateria",
+    "bateria": "Bateria",
+    "motor": "Motor",
+    "choque": "Choque",
+    "llanta": "Llanta",
+    "otros": "Otros",
+}
+
+def _normalizar_categoria(categoria: str) -> str:
+    return _CATEGORIA_NORMALIZADA.get(categoria.strip().lower(), categoria)
+
 if not API_KEY:
     raise ValueError("¡Error! No se encontró GEMINI_API_KEY en el archivo .env")
 
@@ -59,7 +71,7 @@ def generar_ficha_servicio(url_audio: str, urls_fotos: list[str]) -> dict:
     # 3. Consolidar la Ficha Estructurada (Si todo salió bien)
     ficha_db = {
         "transcripcion_audio": resultado_audio["transcripcion"],
-        "categoria_problema": resultado_fotos["categoria"],
+        "categoria_problema": _normalizar_categoria(resultado_fotos["categoria"]),
         "danios_identificados": resultado_fotos["danos_visibles"],
         "resumen_estructurado": resultado_audio["informacion_relevante"]
     }
