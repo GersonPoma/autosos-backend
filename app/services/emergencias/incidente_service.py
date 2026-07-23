@@ -5,8 +5,10 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.paginacion import PaginacionSalida
+from app.models.cuentas.usuario import Usuario
 from app.models.emergencias.incidente import EstadoIncidente, Incidente
 from app.models.emergencias.evidencia import Evidencia
+from app.models.perfiles.cliente import Cliente
 from app.models.talleres.asignacion_candidato import AsignacionCandidato, EstadoNotificacion
 from app.schemas.emergencias.incidente import IncidenteActualizar, IncidenteCrear
 
@@ -208,3 +210,56 @@ def obtener_detalle_incidente(db: Session, incidente_id: int) -> dict:
         "orden_servicio": orden_info,
         "transaccion": transaccion_info
     }
+
+
+def usuario_autorizado_incidente(db: Session, incidente: Incidente, usuario: Usuario) -> bool:
+    """Determina si el usuario puede ver los datos completos de un incidente (para el reporte de siniestro)."""
+    if usuario.super_usuario or usuario.id == incidente.usuario_id:
+        return True
+
+    asignacion = db.query(AsignacionCandidato).filter(
+        AsignacionCandidato.incidente_id == incidente.id,
+        AsignacionCandidato.estado == EstadoNotificacion.ACEPTADO,
+    ).first()
+
+    taller = asignacion.taller if asignacion else None
+    if not taller:
+        return False
+
+    return usuario.id == taller.usuario_id or (
+        usuario.tenant_id is not None and usuario.tenant_id == taller.tenant_id
+    )
+
+
+def obtener_datos_siniestro(db: Session, incidente_id: int) -> dict | None:
+    """Arma el detalle del incidente enriquecido con datos del cliente y vehículo,
+    listo para exportarse como reporte de siniestro para la aseguradora."""
+    detalle = obtener_detalle_incidente(db, incidente_id)
+    if not detalle:
+        return None
+
+    incidente = obtener_por_id(db, incidente_id)
+    cliente = db.query(Cliente).filter(
+        Cliente.usuario_id == incidente.usuario_id,
+        Cliente.deleted == False,
+    ).first()
+
+    cliente_info = None
+    vehiculo_info = None
+    if cliente:
+        cliente_info = {
+            "nombre": f"{cliente.nombre} {cliente.apellido}",
+            "telefono": cliente.telefono,
+            "email": cliente.email,
+        }
+        if cliente.vehiculo:
+            vehiculo_info = {
+                "placa": cliente.vehiculo.placa,
+                "modelo": cliente.vehiculo.modelo,
+                "color": cliente.vehiculo.color,
+            }
+
+    detalle["cliente"] = cliente_info
+    detalle["vehiculo"] = vehiculo_info
+    detalle["codigo_siniestro"] = f"AUTOSOS-{incidente_id:06d}"
+    return detalle

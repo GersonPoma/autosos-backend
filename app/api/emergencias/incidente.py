@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.paginacion import PaginacionSalida
@@ -6,6 +7,7 @@ from app.core.security import get_current_user
 from app.db.session import get_db
 from app.models.cuentas.usuario import Usuario
 from app.schemas.emergencias.incidente import IncidenteActualizar, IncidenteCrear, IncidenteSalida
+from app.services.analitica import exportar_service
 from app.services.emergencias import incidente_service
 from app.tracking.manager import manager
 
@@ -66,6 +68,28 @@ def obtener_detalle_completo(
     if not detalle:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incidente no encontrado")
     return detalle
+
+
+@router.get("/{incidente_id}/reporte-siniestro")
+def obtener_reporte_siniestro(
+    incidente_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    incidente = incidente_service.obtener_por_id(db, incidente_id)
+    if not incidente:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incidente no encontrado")
+
+    if not incidente_service.usuario_autorizado_incidente(db, incidente, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes acceso a este incidente")
+
+    datos = incidente_service.obtener_datos_siniestro(db, incidente_id)
+    buffer = exportar_service.generar_pdf_siniestro(datos)
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="siniestro_{incidente_id}.pdf"'},
+    )
 
 
 @router.put("/{incidente_id}", response_model=IncidenteSalida)
